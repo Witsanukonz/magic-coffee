@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Complete order | MAGIC COFFEE{% endblock %}
+{% block content %}
+<div class="container section"><a class="back-link" href="{% url 'cart' %}">← Back to your order</a><div class="page-heading"><span class="eyebrow">ALMOST COFFEE TIME</span><h1>HOW WOULD YOU<br>LIKE YOUR ORDER?</h1><p>Tell us how to hand over your fresh order.</p></div>
+<form method="post" class="checkout-layout cafe-checkout" data-loyalty-status-url="{% url 'loyalty_status' %}">{% csrf_token %}
+  <div class="form-stack form-panel"><h2>ORDER DETAILS</h2>{{ form.non_field_errors }}
+    <aside class="loyalty-card"><span class="eyebrow">MAGIC REWARDS</span><strong data-loyalty-heading>BUY 10, GET 1 FREE</strong><p data-loyalty-message>Enter your phone number to check for a free coffee reward.</p></aside>
+    {% for field in form %}
+      {% if field.is_hidden %}{{ field }}{{ field.errors }}
+      {% elif field.name == 'reward_line' %}<div data-loyalty-reward{% if not field.value %} hidden{% endif %}>{% include 'partials/field.html' %}</div>
+      {% else %}{% include 'partials/field.html' %}{% endif %}
+    {% endfor %}
+    <div class="dine-in-note"><b>DINE IN</b><span>Your table will be confirmed by the cafe team when you arrive.</span></div>
+  </div>
+  <aside class="order-summary"><span class="eyebrow">YOUR ORDER</span><h2>READY TO BREW</h2>{% for line in items %}<div class="summary-line"><div>{{ line.quantity }} × {{ line.menu_item.name }}<small>{{ line.size }} {{ line.temperature }}{% if line.sweetness %} · {{ line.sweetness }}% sweet{% endif %}</small></div><span>฿{{ line.subtotal|floatformat:2 }}</span></div>{% endfor %}<div class="summary-total"><span>TOTAL</span><span>฿{{ cart.total|default:0|floatformat:2 }}</span></div><button class="button orange full" data-submit-once>PLACE ORDER <span>→</span></button><p class="help-text">No payment is collected in this classroom demo.</p></aside>
+</form></div>
+{% endblock %}

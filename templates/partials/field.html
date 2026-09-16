@@ -1,0 +1,6 @@
+<div class="form-field {% if field.errors %}has-error{% endif %}">
+{% if field.field.widget.input_type == 'radio' or field.field.widget.allow_multiple_selected %}<fieldset><legend>{{ field.label }}{% if field.field.required %}<span class="required"> *</span>{% endif %}</legend>{{ field }}</fieldset>
+{% elif field.field.widget.input_type == 'checkbox' %}<label class="check-label">{{ field }} <span>{{ field.label }}</span></label>
+{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required"> *</span>{% endif %}</label>{{ field }}{% endif %}
+{% if field.help_text %}<div class="help-text">{{ field.help_text|safe }}</div>{% endif %}{{ field.errors }}
+</div>

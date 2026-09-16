@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@source "../../templates";
+@theme {
+  --color-espresso: #181512;
+  --color-coffee: #5C4033;
+  --color-cream: #F5F0E8;
+  --color-warmwhite: #FAF9F6;
+  --color-accent: #B58A5A;
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Manrope', sans-serif;
+}

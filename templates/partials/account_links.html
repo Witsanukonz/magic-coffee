@@ -1,0 +1,4 @@
+{% if user.is_authenticated %}
+{% if user.is_admin %}<a href="{% url 'dashboard' %}">Dashboard</a>{% endif %}
+<a href="{% url 'orders' %}">My Orders</a><a href="{% url 'profile' %}">Profile</a><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Logout</button></form>
+{% else %}<a href="{% url 'login' %}">Login</a><a href="{% url 'register' %}">Register</a>{% endif %}

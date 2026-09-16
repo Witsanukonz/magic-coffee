@@ -1,0 +1,32 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#E96B32">
+  <meta name="description" content="MAGIC COFFEE. Thoughtfully brewed coffee and fresh bites, made for your everyday moments. A classroom demo shop.">
+  <title>{% block title %}MAGIC COFFEE | Brewed for every moment{% endblock %}</title>
+  <link rel="icon" href="{% static 'images/favicon.svg' %}" type="image/svg+xml">
+  <link rel="preload" href="{% static 'fonts/manrope-latin-800-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+  <link rel="stylesheet" href="{% static 'css/site.css' %}">
+  <script src="{% static 'js/site.js' %}" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+{% block shell %}
+<header class="store-header">
+  <div class="nav-wrap">
+    <a class="brand" href="{% url 'home' %}" aria-label="Magic Coffee home"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 12h22v11a10 10 0 0 1-10 10h-2A10 10 0 0 1 8 23Z"/><path d="M30 14h3a5 5 0 0 1 0 10h-3M9 37h22M16 4v4M23 4v4"/></svg><span>MAGIC COFFEE<small>YOUR NEIGHBORHOOD COFFEE BAR</small></span></a>
+    <nav class="desktop-links" aria-label="Main navigation"><a href="{% url 'home' %}" {% if request.path == '/' %}aria-current="page"{% endif %}>Home</a><a href="{% url 'menu_list' %}" {% if '/menu/' in request.path %}aria-current="page"{% endif %}>Menu</a>{% if user.is_authenticated %}<a href="{% url 'orders' %}">My Orders</a>{% endif %}<a href="{% url 'about' %}">About</a></nav>
+    <div class="nav-actions"><a class="icon-link search-link" href="{% url 'menu_list' %}#search" aria-label="Search menu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></a><a class="cart-link" href="{% url 'cart' %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14l1 14H4L5 7ZM8 8V6a4 4 0 0 1 8 0v2"/></svg><span>Your order</span><b>{{ cart_count }}</b></a><a class="nav-order" href="{% url 'menu_list' %}">ORDER NOW</a><button class="mobile-toggle" aria-controls="account-nav" aria-expanded="false" data-toggle="account-nav" aria-label="Open navigation">☰</button>
+    <details class="account-menu"><summary>Account <span>⌄</span></summary><div>{% include 'partials/account_links.html' %}</div></details></div>
+  </div>
+  <nav id="account-nav" class="mobile-menu" aria-label="Mobile navigation" hidden><a href="{% url 'home' %}">Home</a><a href="{% url 'menu_list' %}">Menu & search</a>{% if user.is_authenticated %}<a href="{% url 'orders' %}">My Orders</a>{% endif %}<a href="{% url 'about' %}">About</a>{% include 'partials/account_links.html' %}</nav>
+</header>
+{% include 'partials/messages.html' %}
+<main id="main">{% block content %}{% endblock %}</main>
+<footer class="store-footer"><div class="container footer-main"><div><a class="brand" href="{% url 'home' %}">MAGIC COFFEE</a><p>Fresh coffee, warm food, your daily moment.</p></div><div><span class="eyebrow">COME AS YOU ARE.</span><a href="{% url 'menu_list' %}">Find your next drink ↗</a></div></div><div class="container footer-bottom"><span>© {% now 'Y' %} MAGIC COFFEE</span><span>Digital cafe ordering demo</span><a href="{% url 'about' %}">About the cafe</a></div></footer>
+{% endblock %}
+<dialog id="delete-dialog"><div class="dialog-content"><span class="eyebrow">PLEASE CONFIRM</span><h2>Delete this item?</h2><p id="delete-description">This action cannot be undone.</p><div class="button-row"><button class="button secondary" type="button" data-close-dialog>Keep item</button><form method="post" id="delete-form">{% csrf_token %}<button class="button danger" type="submit">Yes, delete</button></form></div></div></dialog>
+</body></html>

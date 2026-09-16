@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}{{ order.order_number }} | MAGIC COFFEE{% endblock %}
+{% block content %}
+<div class="container section" data-live-order-url="{% url 'order_status' order.pk %}" data-order-status="{{ order.status }}">
+  <a class="back-link" href="{% url 'orders' %}">← My orders</a>
+  <div class="page-heading order-tracking-heading">
+    <span class="eyebrow">MAGIC COFFEE ORDER QUEUE · <span class="live-order-note">LIVE</span></span>
+    <h1>{{ order.order_number }}</h1>
+    <p class="tracking-status" data-order-tracking-status aria-live="polite">{% if order.status == 'pending' %}WE RECEIVED YOUR ORDER{% elif order.status == 'preparing' %}BREWING YOUR ORDER{% elif order.status == 'ready' %}READY FOR PICKUP{% elif order.status == 'cancelled' %}ORDER CANCELLED{% else %}ORDER COMPLETE{% endif %}</p>
+    <div class="queue-meta"><b>ESTIMATED WAIT</b><span>8–12 MIN</span></div>
+  </div>
+  <div class="tracking-timeline">
+    <span data-status-step="pending" class="done">✓ ORDER RECEIVED</span>
+    <span data-status-step="preparing" class="{% if order.status != 'pending' and order.status != 'cancelled' %}done{% endif %}">● PREPARING</span>
+    <span data-status-step="ready" class="{% if order.status == 'ready' or order.status == 'completed' %}done{% endif %}">○ READY FOR PICKUP</span>
+    <span data-status-step="completed" class="{% if order.status == 'completed' %}done{% endif %}">○ COMPLETED</span>
+  </div>
+  {% if order.loyalty_account %}<aside class="loyalty-card order-loyalty"><span class="eyebrow">MAGIC REWARDS · PHONE LINKED</span><strong data-loyalty-visits>{{ order.loyalty_account.completed_purchases }} COMPLETED VISITS</strong><p><span data-loyalty-rewards>{{ order.loyalty_account.reward_balance }}</span> FREE COFFEE REWARD{{ order.loyalty_account.reward_balance|pluralize }} AVAILABLE · Every 10 completed purchases earns 1.</p></aside>{% endif %}
+  {% include 'partials/order_content.html' %}
+</div>
+{% endblock %}

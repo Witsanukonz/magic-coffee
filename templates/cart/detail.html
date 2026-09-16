@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Your order | MAGIC COFFEE{% endblock %}
+{% block content %}
+<div class="container section">
+  <div class="page-heading"><span class="eyebrow">ONE STEP CLOSER TO COFFEE</span><h1>YOUR ORDER</h1><p>Review your drinks before we start brewing.</p></div>
+  {% if items %}
+  <div class="checkout-layout">
+    <div class="cart-items">
+      {% for line in items %}
+      <article class="cart-item">
+        <img src="{{ line.menu_item.image.url }}" alt="{{ line.menu_item.name }}">
+        <div class="cart-item-main">
+          <h3><a href="{% url 'menu_detail' line.menu_item.slug %}">{{ line.menu_item.name }}</a></h3>
+          <p class="muted">{{ line.size }}{% if line.temperature %} · {{ line.temperature }} · {{ line.sweetness }}% sweet{% endif %}</p>
+          <p>฿{{ line.menu_item.price|floatformat:2 }}</p>
+          <div class="cart-controls">
+            <form action="{% url 'cart_update' line.pk %}" method="post" class="inline-form cart-quantity-form" data-price="{{ line.menu_item.price }}">
+              {% csrf_token %}
+              <label class="sr-only" for="qty-{{ line.pk }}">Quantity for {{ line.menu_item.name }}</label>
+              <button class="qty-submit" type="button" data-quantity="-1" aria-label="Decrease quantity" {% if line.quantity == 1 %}disabled{% endif %}>−</button>
+              <input id="qty-{{ line.pk }}" type="number" name="quantity" min="1" max="{{ line.menu_item.stock }}" value="{{ line.quantity }}">
+              <button class="qty-submit" type="button" data-quantity="1" aria-label="Increase quantity" {% if line.quantity == line.menu_item.stock %}disabled{% endif %}>+</button>
+            </form>
+            <p class="cart-update-error" data-cart-error hidden aria-live="polite"></p>
+            <form method="post" action="{% url 'cart_remove' line.pk %}">{% csrf_token %}<button class="remove-link">REMOVE</button></form>
+          </div>
+        </div>
+        <strong data-line-total>฿{{ line.subtotal|floatformat:2 }}</strong>
+      </article>
+      {% endfor %}
+      <a class="back-link" href="{% url 'menu_list' %}">← Add another drink</a>
+    </div>
+    <aside class="order-summary">
+      <span class="eyebrow">YOUR ORDER</span><h2>ORDER SUMMARY</h2>
+      <div class="summary-row"><span data-order-item-count>{{ cart_count }} ITEMS</span><span data-order-total>฿{{ cart.total|floatformat:2 }}</span></div>
+      <div class="summary-total"><span>TOTAL</span><span data-order-total>฿{{ cart.total|floatformat:2 }}</span></div>
+      <a class="button orange full" href="{% url 'checkout' %}">CONTINUE TO ORDER <span>→</span></a>
+      <p class="help-text">No payment needed. Stock is confirmed when your order is placed.</p>
+    </aside>
+  </div>
+  {% else %}
+  <div class="empty-state"><span class="empty-icon">☕</span><h2>Your next coffee is waiting.</h2><p>Your order is empty. Let's find something good.</p><a class="button orange" href="{% url 'menu_list' %}">EXPLORE THE MENU ↗</a></div>
+  {% endif %}
+</div>
+{% endblock %}

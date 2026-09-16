@@ -1,0 +1,15 @@
+{
+  "name": "magic-coffee-assets",
+  "private": true,
+  "scripts": {
+    "build:css": "npx @tailwindcss/cli -i static/css/input.css -o static/css/tailwind.css --minify",
+    "test:browser": "node scripts/browser-test.cjs"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.1.0",
+    "@tailwindcss/cli": "^4.1.0",
+    "@fontsource/manrope": "^5.2.0",
+    "@fontsource/inter": "^5.2.0",
+    "@playwright/test": "^1.58.0"
+  }
+}
