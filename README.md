@@ -4,27 +4,28 @@
 
 เว็บร้านกาแฟสำหรับโปรเจกต์รายวิชา ใช้ Django Templates พร้อมระบบสั่งซื้อจำลองและ Custom Admin Dashboard ที่ `/dashboard/` ไม่มีการชำระเงินจริง
 
-## เปิดเดโมอย่างเร็วบน Windows
+## เริ่มจาก Clone: วิธีง่ายที่สุด
 
-ติดตั้ง Python 3.12 ขึ้นไป แล้วดับเบิลคลิก **START_MAGIC_COFFEE.bat** หรือรัน:
+ติดตั้ง **Python 3.12 ขึ้นไป** และ **Git** ก่อน โดยตอนติดตั้ง Python ให้เลือก **Add Python to PATH** แล้วเปิด PowerShell ใหม่ ตรวจได้ด้วย:
 
 ```powershell
+python --version
+git --version
+```
+
+จากนั้นเปิด PowerShell แล้วรันตามลำดับนี้:
+
+```powershell
+git clone https://github.com/Witsanukonz/magic-coffee.git
+cd magic-coffee
 powershell -ExecutionPolicy Bypass -File .\run.ps1
 ```
 
-เปิด **http://127.0.0.1:8000/**
+รอจนเห็นข้อความ `MAGIC COFFEE is ready` แล้วเปิด [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
 
-สคริปต์สร้าง `.venv` และติดตั้ง dependencies เมื่อยังไม่มี จากนั้น migrate, seed แบบไม่ทับข้อมูลเดิม และเปิด development server ใช้ Python ใน `.venv` โดยตรง **ไม่ได้ activate terminal ของผู้ใช้** กด Ctrl+C เพื่อหยุด ถ้าพอร์ต 8000 ถูกใช้ ให้เพิ่ม `-Port 8001`
+คำสั่งสุดท้ายเพียงคำสั่งเดียวจะสร้าง `.venv`, ติดตั้ง dependencies, สร้างฐานข้อมูล SQLite, อัปเดต migrations และสร้างข้อมูลเดโมให้ครบ โดยไม่ทับข้อมูลเดิม ต้องใช้อินเทอร์เน็ตเฉพาะตอนดาวน์โหลด dependencies ครั้งแรก
 
-## Clone แล้วเปิดใช้งาน
-
-หลัง clone โปรเจกต์จาก GitHub ให้เปิด PowerShell ในโฟลเดอร์โปรเจกต์ แล้วใช้เพียงคำสั่งนี้:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\run.ps1
-```
-
-หรือดับเบิลคลิก `START_MAGIC_COFFEE.bat` ได้เลย สคริปต์จะสร้าง virtual environment, ติดตั้ง dependencies, อัปเดตฐานข้อมูล และสร้างข้อมูลเดโมให้อัตโนมัติ โดยไม่ทับข้อมูลที่มีอยู่ จากนั้นเปิด [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+ไม่อยากพิมพ์คำสั่ง สามารถดับเบิลคลิก `START_MAGIC_COFFEE.bat` หลัง clone ได้เลย
 
 | บัญชีเดโม | Username | Password |
 |---|---|---|
@@ -32,6 +33,14 @@ powershell -ExecutionPolicy Bypass -File .\run.ps1
 | Customer | `demo_customer` | `MagicDemo!2026` |
 
 บัญชีเหล่านี้ใช้สำหรับเดโมในเครื่องเท่านั้น ตั้งรหัสอื่นก่อนสร้างข้อมูลครั้งแรกได้ด้วย environment variables `MAGIC_ADMIN_PASSWORD` และ `MAGIC_CUSTOMER_PASSWORD` การ seed ซ้ำจะไม่เปลี่ยนรหัสผ่านหรือข้อมูลที่แก้ไปแล้ว
+
+หน้าเว็บที่ใช้บ่อย:
+
+- หน้าร้าน: `http://127.0.0.1:8000/`
+- เข้าสู่ระบบ: `http://127.0.0.1:8000/accounts/login/`
+- Dashboard แอดมิน: `http://127.0.0.1:8000/dashboard/`
+
+กด `Ctrl+C` ใน PowerShell เพื่อหยุดเว็บ ครั้งต่อไปไม่ต้องติดตั้งใหม่ ให้เปิด PowerShell ในโฟลเดอร์เดิมแล้วรัน `powershell -ExecutionPolicy Bypass -File .\run.ps1` อีกครั้ง หากพอร์ต 8000 ถูกใช้งาน ให้ต่อท้าย `-Port 8001`
 
 ## Features
 
