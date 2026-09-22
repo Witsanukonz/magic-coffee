@@ -1,9 +1,12 @@
+"""งานระดับตะกร้า: ระบุเจ้าของตะกร้า, รวมตะกร้า และตรวจ stock ก่อนเพิ่มสินค้า."""
+
 from django.db import transaction
 from django.db.models import Sum
 from .models import Cart, CartItem
 
 
 def get_cart(request, create=True):
+    """คืนตะกร้าของผู้ใช้ที่ล็อกอิน หรือของ session สำหรับผู้เยี่ยมชม."""
     if request.user.is_authenticated:
         lookup = {'user': request.user}
     else:
@@ -19,6 +22,7 @@ def get_cart(request, create=True):
 
 @transaction.atomic
 def merge_guest_cart(user, session_key):
+    """ย้ายรายการจากตะกร้า guest เข้า account หลังเข้าสู่ระบบ/สมัครสมาชิก."""
     if not session_key:
         return
     guest = Cart.objects.filter(session_key=session_key, user__isnull=True).first()
@@ -35,6 +39,7 @@ def merge_guest_cart(user, session_key):
 
 
 def add_item(cart, menu_item, data):
+    """เพิ่มรายการตามตัวเลือกเครื่องดื่ม โดยไม่ให้ยอดในตะกร้าเกิน stock."""
     if not menu_item.can_order:
         raise ValueError('This item is currently unavailable.')
     quantity = data['quantity']

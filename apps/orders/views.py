@@ -1,3 +1,5 @@
+"""หน้าชำระเงิน, ประวัติออเดอร์ และ API สำหรับอัปเดตสถานะแบบ live."""
+
 import uuid
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -8,12 +10,22 @@ from django.views.decorators.http import require_POST
 from apps.cart.services import get_cart
 from .forms import CheckoutForm
 from .models import LoyaltyAccount, Order
-from .services import place_order
-from .services import normalize_phone
+from .services import normalize_phone, place_order
+
+
+# ข้อความที่ลูกค้าเห็นระหว่างติดตามออเดอร์; key ตรงกับ Order.Status.
+ORDER_STATUS_MESSAGES = {
+    'pending': 'WE RECEIVED YOUR ORDER',
+    'preparing': 'BREWING YOUR ORDER',
+    'ready': 'READY FOR PICKUP',
+    'completed': 'ORDER COMPLETE',
+    'cancelled': 'ORDER CANCELLED',
+}
 
 
 @login_required
 def checkout(request):
+    """ตรวจ form แล้วส่งงานสร้างออเดอร์ให้ service ซึ่งดูแล stock และแต้ม."""
     cart = get_cart(request, create=False)
     if request.method == 'GET' and (not cart or not cart.items.exists()):
         return redirect('cart')
@@ -46,6 +58,7 @@ def checkout(request):
 @login_required
 @require_POST
 def loyalty_status(request):
+    """API ตรวจสิทธิ์กาแฟฟรีจากเบอร์โทร โดยไม่เปิดข้อมูลส่วนตัวอื่น."""
     phone = normalize_phone(request.POST.get('phone', ''))
     account = LoyaltyAccount.objects.filter(phone=phone).first() if 8 <= len(phone) <= 15 else None
     return JsonResponse({
@@ -57,36 +70,33 @@ def loyalty_status(request):
 
 @login_required
 def order_list(request):
+    """แสดงเฉพาะประวัติออเดอร์ของผู้ใช้ที่ล็อกอินอยู่."""
     orders = request.user.orders.prefetch_related('items')
     return render(request, 'orders/list.html', {'page_obj': Paginator(orders, 10).get_page(request.GET.get('page'))})
 
 
 @login_required
 def order_detail(request, pk):
+    """แสดงรายละเอียดออเดอร์ของเจ้าของออเดอร์เท่านั้น."""
     order = get_object_or_404(Order.objects.prefetch_related('items'), pk=pk, user=request.user)
     return render(request, 'orders/detail.html', {'order': order})
 
 
 @login_required
 def order_status(request, pk):
+    """API ที่หน้า My Order เรียกทุก 5 วินาทีเพื่อแสดงสถานะล่าสุด."""
     order = get_object_or_404(Order.objects.select_related('loyalty_account'), pk=pk, user=request.user)
-    messages = {
-        'pending': 'WE RECEIVED YOUR ORDER',
-        'preparing': 'BREWING YOUR ORDER',
-        'ready': 'READY FOR PICKUP',
-        'completed': 'ORDER COMPLETE',
-        'cancelled': 'ORDER CANCELLED',
-    }
     loyalty = None
     if order.loyalty_account:
         loyalty = {'completed_purchases': order.loyalty_account.completed_purchases,
                    'reward_balance': order.loyalty_account.reward_balance}
     response = JsonResponse({'status': order.status, 'display': order.get_status_display(),
-        'message': messages[order.status], 'updated_at': order.updated_at.isoformat(), 'loyalty': loyalty})
+        'message': ORDER_STATUS_MESSAGES[order.status], 'updated_at': order.updated_at.isoformat(), 'loyalty': loyalty})
     response['Cache-Control'] = 'no-store'
     return response
 
 
 @login_required
 def order_success(request, pk):
+    """หน้าสรุปหลังสั่งสำเร็จ; ยืนยันว่าออเดอร์เป็นของผู้ใช้คนปัจจุบัน."""
     return render(request, 'orders/success.html', {'order': get_object_or_404(Order, pk=pk, user=request.user)})

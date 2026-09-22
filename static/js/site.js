@@ -1,3 +1,4 @@
+// 1) ปฏิสัมพันธ์พื้นฐานร่วมกัน: เมนูพับ, sidebar และกล่องข้อความ.
 document.querySelectorAll('[data-toggle]').forEach(button => {
   button.addEventListener('click', () => {
     const target = document.getElementById(button.dataset.toggle);
@@ -18,6 +19,8 @@ document.addEventListener('keydown', event => {
 });
 document.querySelectorAll('[data-dismiss]').forEach(button => button.addEventListener('click', () => button.parentElement.remove()));
 const money = amount => `฿${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// 2) ตะกร้า: คำนวณราคาหน้าจอทันที แล้วบันทึกจำนวนจริงผ่าน API.
 const refreshCartTotals = () => {
   const forms = [...document.querySelectorAll('.cart-quantity-form')];
   let total = 0;
@@ -80,6 +83,8 @@ document.querySelectorAll('.cart-quantity-form').forEach(form => form.addEventLi
   const input = form.querySelector('input[type="number"][name="quantity"]');
   saveCartQuantity(form, Number(input?.defaultValue) || Number(input?.min || 1));
 }));
+
+// 3) แต้มสะสม: เช็กสิทธิ์จากเบอร์โทร และซ่อนตัวเลือกกาแฟฟรีหากยังไม่ครบเงื่อนไข.
 const loyaltyForm = document.querySelector('[data-loyalty-status-url]');
 const loyaltyPhone = loyaltyForm?.querySelector('#id_phone');
 const loyaltyReward = loyaltyForm?.querySelector('[data-loyalty-reward]');
@@ -122,6 +127,8 @@ if (loyaltyPhone) loyaltyPhone.addEventListener('input', () => {
   clearTimeout(loyaltyLookupTimer);
   loyaltyLookupTimer = window.setTimeout(checkLoyaltyReward, 350);
 });
+
+// 4) ลูกค้า: polling สถานะออเดอร์เพื่อให้หน้า My Order อัปเดตเอง.
 const orderRanks = { pending: 1, preparing: 2, ready: 3, completed: 4 };
 const refreshLiveOrder = (container, order) => {
   if (!order.status) return;
@@ -157,6 +164,8 @@ if (document.querySelector('[data-live-order-url]')) {
   window.setInterval(pollLiveOrders, 5000);
   document.addEventListener('visibilitychange', pollLiveOrders);
 }
+
+// 5) แอดมิน: โหลด Kanban board ใหม่เพื่อให้ออเดอร์เข้ามาโดยไม่ต้องรีเฟรชหน้า.
 const adminOrderContainers = [...document.querySelectorAll('[data-admin-orders-url]')];
 if (adminOrderContainers.length) {
   const knownAdminOrderIds = new Set([...document.querySelectorAll('[data-order-id]')].map(order => order.dataset.orderId));
@@ -179,6 +188,8 @@ if (adminOrderContainers.length) {
   window.setInterval(pollAdminOrders, 2000);
   document.addEventListener('visibilitychange', pollAdminOrders);
 }
+
+// 6) แอดมิน: แสดง stock alerts ที่ sidebar และ badge ของออเดอร์ใหม่บน Live Orders.
 const adminAlertPanel = document.querySelector('[data-admin-alerts-url]');
 if (adminAlertPanel) {
   const adminAlertList = adminAlertPanel.querySelector('[data-admin-alert-list]');
@@ -235,6 +246,8 @@ if (adminAlertPanel) {
   window.setInterval(pollAdminAlerts, 4000);
   document.addEventListener('visibilitychange', pollAdminAlerts);
 }
+
+// 7) ยูทิลิตีหน้าแอดมิน: preview รูป, confirm ลบ และ quick-order dialog.
 document.querySelectorAll('[data-preview]').forEach(input => {
   let objectUrl;
   input.addEventListener('change', () => {

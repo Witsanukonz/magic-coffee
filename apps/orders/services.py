@@ -1,3 +1,9 @@
+"""กติกากลางของการสร้างออเดอร์และเปลี่ยนสถานะออเดอร์.
+
+Views เรียกใช้ไฟล์นี้แทนการแก้ stock, ยอดเงิน หรือแต้มสะสมเอง เพื่อให้
+การสั่งซื้อหนึ่งครั้งเป็น transaction เดียว: สำเร็จทั้งหมด หรือไม่บันทึกเลย.
+"""
+
 from collections import Counter
 from decimal import Decimal
 from django.db import transaction
@@ -7,11 +13,17 @@ from apps.menu.models import MenuItem
 from .models import LoyaltyAccount, Order, OrderItem
 
 
+LOYALTY_PURCHASES_PER_REWARD = 10
+ORDER_FORM_FIELDS = ('full_name', 'phone', 'order_type', 'note', 'checkout_token')
+
+
 def normalize_phone(phone):
+    """เก็บเบอร์โทรในรูปตัวเลขล้วน เพื่อให้ค้นหาแต้มของลูกค้าคนเดิมได้เสมอ."""
     return ''.join(char for char in phone if char.isdigit())
 
 
 def _locked_loyalty_account(phone):
+    """คืนบัญชีแต้มที่ถูกล็อกไว้ ป้องกันการใช้แต้มซ้ำจากการกดพร้อมกัน."""
     normalized = normalize_phone(phone)
     account, _ = LoyaltyAccount.objects.get_or_create(phone=normalized)
     return LoyaltyAccount.objects.select_for_update().get(pk=account.pk)
@@ -19,12 +31,15 @@ def _locked_loyalty_account(phone):
 
 @transaction.atomic
 def place_order(user, cart, data, reward_line_id=None):
+    """สร้างออเดอร์, ตัด stock, ใช้รางวัล และล้างตะกร้าใน transaction เดียว."""
+    # Token เดิมหมายถึงผู้ใช้กดส่งซ้ำ จึงคืนออเดอร์เดิมแทนการตัด stock ซ้ำ.
     existing = Order.objects.filter(checkout_token=data['checkout_token'], user=user).first()
     if existing:
         return existing
     lines = list(cart.items.select_related('menu_item__category')) if cart else []
     if not lines:
         raise ValueError('Your cart is empty.')
+    # ขั้นที่ 1: ตรวจสอบรายการในตะกร้าและรวมจำนวนของเมนูเดียวกัน.
     quantities = Counter()
     total = Decimal('0.00')
     for line in lines:
@@ -36,6 +51,7 @@ def place_order(user, cart, data, reward_line_id=None):
             raise ValueError(f'Options for {item.name} have changed. Remove it and choose again.')
         quantities[item.pk] += line.quantity
         total += line.subtotal
+    # ขั้นที่ 2: ตรวจสิทธิ์กาแฟฟรี โดยอนุญาตเฉพาะเมนูประเภท coffee.
     reward_line = None
     if reward_line_id:
         reward_line = next((line for line in lines if str(line.pk) == str(reward_line_id)), None)
@@ -49,31 +65,50 @@ def place_order(user, cart, data, reward_line_id=None):
         discount = reward_line.menu_item.price
         loyalty_account.reward_balance -= 1
         loyalty_account.save(update_fields=['reward_balance', 'updated_at'])
-    # Conditional database updates prevent overselling, including multiple options of the same menu.
+    # ขั้นที่ 3: ลด stock แบบมีเงื่อนไขในฐานข้อมูล ป้องกันขายเกินแม้มีคนสั่งพร้อมกัน.
     for item_id, quantity in sorted(quantities.items()):
         changed = MenuItem.objects.filter(pk=item_id, stock__gte=quantity, is_available=True,
             category__is_active=True, available_date__lte=timezone.localdate()).update(stock=F('stock') - quantity)
         if not changed:
             raise ValueError('Stock changed while ordering. Please review your cart and try again.')
-    order = Order.objects.create(user=user, loyalty_account=loyalty_account, total_price=total - discount,
-        loyalty_discount=discount, loyalty_reward_item_name=reward_line.menu_item.name if reward_line else '',
-        loyalty_reward_redeemed=bool(reward_line), **{k: data[k] for k in
-        ['full_name', 'phone', 'order_type', 'note', 'checkout_token']})
+    # ขั้นที่ 4: บันทึกข้อมูลออเดอร์และ snapshot รายการสินค้า ณ เวลาที่สั่ง.
+    order = Order.objects.create(
+        user=user,
+        loyalty_account=loyalty_account,
+        total_price=total - discount,
+        loyalty_discount=discount,
+        loyalty_reward_item_name=reward_line.menu_item.name if reward_line else '',
+        loyalty_reward_redeemed=bool(reward_line),
+        **{field: data[field] for field in ORDER_FORM_FIELDS},
+    )
     order.order_number = f'MC{order.pk:05d}'
     order.save(update_fields=['order_number'])
-    OrderItem.objects.bulk_create([OrderItem(order=order, menu_item=line.menu_item, menu_name=line.menu_item.name,
-        price=line.menu_item.price, quantity=line.quantity, size=line.size, temperature=line.temperature,
-        sweetness=line.sweetness, subtotal=line.subtotal) for line in lines])
+    OrderItem.objects.bulk_create([
+        OrderItem(
+            order=order, menu_item=line.menu_item, menu_name=line.menu_item.name,
+            price=line.menu_item.price, quantity=line.quantity, size=line.size,
+            temperature=line.temperature, sweetness=line.sweetness, subtotal=line.subtotal,
+        )
+        for line in lines
+    ])
+    # ขั้นที่ 5: สำเร็จแล้วจึงล้างตะกร้า; หากขั้นใดผิดพลาด transaction จะย้อนกลับทั้งหมด.
     cart.items.all().delete()
     return order
 
 
-TRANSITIONS = {'pending': ['preparing', 'cancelled'], 'preparing': ['ready', 'cancelled'],
-               'ready': ['completed', 'cancelled'], 'completed': [], 'cancelled': []}
+# แผนผังสถานะที่หน้าแอดมินและ service ใช้ร่วมกัน.
+TRANSITIONS = {
+    'pending': ['preparing', 'cancelled'],
+    'preparing': ['ready', 'cancelled'],
+    'ready': ['completed', 'cancelled'],
+    'completed': [],
+    'cancelled': [],
+}
 
 
 @transaction.atomic
 def change_status(order_id, status):
+    """เปลี่ยนสถานะตามลำดับที่อนุญาต พร้อมคืน stock/แต้มเมื่อยกเลิก."""
     order = Order.objects.select_for_update().get(pk=order_id)
     if status == order.status:
         return order
@@ -83,6 +118,7 @@ def change_status(order_id, status):
     changed = Order.objects.filter(pk=order.pk, status=previous).update(status=status, updated_at=timezone.now())
     if not changed:
         raise ValueError('Another admin updated this order. Refresh and try again.')
+    # ยกเลิก: คืน stock และคืนรางวัลที่ลูกค้าแลกไป.
     if status == 'cancelled':
         for line in order.items.exclude(menu_item=None):
             MenuItem.objects.filter(pk=line.menu_item_id).update(stock=F('stock') + line.quantity)
@@ -90,13 +126,14 @@ def change_status(order_id, status):
             account = LoyaltyAccount.objects.select_for_update().get(pk=order.loyalty_account_id)
             account.reward_balance += 1
             account.save(update_fields=['reward_balance', 'updated_at'])
+    # สำเร็จ: นับการซื้อ 1 ครั้ง และให้กาแฟฟรีเมื่อครบทุก 10 ครั้ง.
     if status == 'completed' and order.loyalty_account_id and not order.loyalty_awarded:
         if order.loyalty_reward_redeemed:
             Order.objects.filter(pk=order.pk, loyalty_awarded=False).update(loyalty_awarded=True)
         else:
             account = LoyaltyAccount.objects.select_for_update().get(pk=order.loyalty_account_id)
             account.completed_purchases += 1
-            if account.completed_purchases % 10 == 0:
+            if account.completed_purchases % LOYALTY_PURCHASES_PER_REWARD == 0:
                 account.reward_balance += 1
             account.save(update_fields=['completed_purchases', 'reward_balance', 'updated_at'])
             Order.objects.filter(pk=order.pk, loyalty_awarded=False).update(loyalty_awarded=True)

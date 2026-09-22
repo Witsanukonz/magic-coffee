@@ -1,3 +1,5 @@
+"""หน้าจัดการร้านสำหรับแอดมิน รวม CRUD เมนู, ลูกค้า และบอร์ดออเดอร์ live."""
+
 from functools import wraps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -17,7 +19,17 @@ from apps.orders.models import Order
 from apps.orders.services import change_status, TRANSITIONS
 
 
+ORDER_BOARD_COLUMNS = (
+    ('pending', 'NEW'),
+    ('preparing', 'PREPARING'),
+    ('ready', 'READY'),
+    ('completed', 'COMPLETED'),
+)
+SIDEBAR_ALERT_LIMIT = 3
+
+
 def admin_required(view):
+    """อนุญาตเฉพาะผู้ใช้ role admin; ผู้ใช้ทั่วไปจะได้รับ 403."""
     @wraps(view)
     @login_required
     def wrapped(request, *args, **kwargs):
@@ -29,6 +41,7 @@ def admin_required(view):
 
 @admin_required
 def overview(request):
+    """สรุปจำนวนเมนู, ลูกค้า, ออเดอร์ และ stock สำหรับหน้าแรกแอดมิน."""
     today = timezone.localdate()
     return render(request, 'dashboard/overview.html', {
         'active': 'overview', 'menu_count': MenuItem.objects.count(),
@@ -51,20 +64,25 @@ RESOURCES = {
 
 
 def _recent_orders():
+    """ดึงออเดอร์ล่าสุดพร้อมจำนวนรายการ เพื่อใช้ซ้ำใน overview และ live endpoint."""
     return Order.objects.select_related('user').annotate(item_count=Sum('items__quantity')).order_by('-created_at', '-pk')[:6]
 
 
 def _order_board(orders):
+    """จัดออเดอร์เป็นคอลัมน์ Kanban และบอกสถานะถัดไปที่กดได้."""
     board_orders = list(orders.prefetch_related('items'))
     for order in board_orders:
         allowed = TRANSITIONS[order.status]
         order.next_status = allowed[0] if allowed else ''
-    return [{'key': key, 'label': label, 'orders': [order for order in board_orders if order.status == key]}
-            for key, label in [('pending', 'NEW'), ('preparing', 'PREPARING'), ('ready', 'READY'), ('completed', 'COMPLETED')]]
+    return [
+        {'key': key, 'label': label, 'orders': [order for order in board_orders if order.status == key]}
+        for key, label in ORDER_BOARD_COLUMNS
+    ]
 
 
 @admin_required
 def resource_list(request, resource):
+    """รายการ CRUD กลางของ Menu, Categories และ Users พร้อมตัวกรองตามชนิดข้อมูล."""
     model, _, label = RESOURCES[resource]
     objects = model.objects.all()
     query = request.GET.get('q', '').strip()
@@ -98,6 +116,7 @@ def resource_list(request, resource):
 
 @admin_required
 def resource_edit(request, resource, pk=None):
+    """สร้างหรือแก้ไขข้อมูลจาก RESOURCES โดยใช้ form ที่ตรงกับ resource นั้น."""
     model, form_class, label = RESOURCES[resource]
     obj = get_object_or_404(model, pk=pk) if pk else None
     kwargs = {'actor': request.user} if resource == 'users' else {}
@@ -112,6 +131,7 @@ def resource_edit(request, resource, pk=None):
 
 @admin_required
 def resource_detail(request, resource, pk):
+    """แสดงรายละเอียดรายการเดียวในหน้าจัดการร้าน."""
     model, _, label = RESOURCES[resource]
     obj = get_object_or_404(model, pk=pk)
     return render(request, 'dashboard/detail.html', {'active': resource, 'resource': resource, 'label': label, 'object': obj})
@@ -120,6 +140,7 @@ def resource_detail(request, resource, pk):
 @admin_required
 @require_POST
 def resource_delete(request, resource, pk):
+    """ลบรายการโดยกันแอดมินลบบัญชีตัวเองและกันหมวดหมู่ที่ยังมีเมนู."""
     model, _, label = RESOURCES[resource]
     obj = get_object_or_404(model, pk=pk)
     if resource == 'users' and obj.pk == request.user.pk:
@@ -136,6 +157,7 @@ def resource_delete(request, resource, pk):
 @admin_required
 @require_POST
 def user_toggle(request, pk):
+    """เปิด/ปิดบัญชีผู้ใช้ โดยห้ามแอดมินปิดบัญชีของตัวเอง."""
     user = get_object_or_404(User, pk=pk)
     if user.pk == request.user.pk:
         messages.error(request, 'You cannot disable your own account.')
@@ -148,6 +170,7 @@ def user_toggle(request, pk):
 
 @admin_required
 def order_list(request):
+    """แสดงรายการและ Kanban board ของออเดอร์ด้วย query set ชุดเดียวกัน."""
     orders = Order.objects.select_related('user').annotate(item_count=Sum('items__quantity')).order_by('-created_at', '-pk')
     query = request.GET.get('q', '').strip()
     if query:
@@ -162,6 +185,7 @@ def order_list(request):
 
 @admin_required
 def live_recent_orders(request):
+    """ส่ง HTML ของออเดอร์ล่าสุดให้ dashboard ดึงใหม่โดยไม่ใช้ cache."""
     response = render(request, 'dashboard/order_table.html', {'orders': _recent_orders()})
     response['Cache-Control'] = 'no-store'
     return response
@@ -169,6 +193,7 @@ def live_recent_orders(request):
 
 @admin_required
 def live_order_board(request):
+    """ส่ง HTML board ล่าสุดให้หน้า Live Orders ดึงทุก 2 วินาที."""
     orders = Order.objects.select_related('user').annotate(item_count=Sum('items__quantity')).order_by('-created_at', '-pk')
     response = render(request, 'dashboard/order_board.html', {'board': _order_board(orders)})
     response['Cache-Control'] = 'no-store'
@@ -177,12 +202,13 @@ def live_order_board(request):
 
 @admin_required
 def live_sidebar_alerts(request):
+    """API สำหรับ stock alerts และ badge จำนวนออเดอร์ใหม่ที่เมนู Live Orders."""
     alerts = []
     pending_order_count = Order.objects.filter(status='pending').count()
-    for item in MenuItem.objects.filter(is_available=True, stock=0).order_by('name')[:3]:
+    for item in MenuItem.objects.filter(is_available=True, stock=0).order_by('name')[:SIDEBAR_ALERT_LIMIT]:
         alerts.append({'id': f'out-{item.pk}', 'kind': 'out', 'title': 'Out of stock',
                        'detail': item.name, 'url': reverse('dashboard_edit', kwargs={'resource': 'menu', 'pk': item.pk})})
-    for item in MenuItem.objects.filter(is_available=True, stock__gt=0, stock__lte=5).order_by('stock', 'name')[:3]:
+    for item in MenuItem.objects.filter(is_available=True, stock__gt=0, stock__lte=5).order_by('stock', 'name')[:SIDEBAR_ALERT_LIMIT]:
         alerts.append({'id': f'low-{item.pk}', 'kind': 'low', 'title': f'Only {item.stock} left',
                        'detail': item.name, 'url': reverse('dashboard_edit', kwargs={'resource': 'menu', 'pk': item.pk})})
     response = JsonResponse({'alerts': alerts, 'pending_order_count': pending_order_count})
@@ -192,6 +218,7 @@ def live_sidebar_alerts(request):
 
 @admin_required
 def order_detail(request, pk):
+    """แสดงและเปลี่ยนสถานะออเดอร์ โดยมอบกติกาการเปลี่ยนสถานะให้ service."""
     order = get_object_or_404(Order.objects.select_related('user').prefetch_related('items'), pk=pk)
     if request.method == 'POST':
         try:
@@ -210,6 +237,7 @@ def order_detail(request, pk):
 @admin_required
 @require_POST
 def menu_availability(request, pk):
+    """สลับสถานะขายของเมนูจากหน้าแอดมิน โดยเก็บค่าไว้ในฐานข้อมูล."""
     item = get_object_or_404(MenuItem, pk=pk)
     item.is_available = not item.is_available
     item.save(update_fields=['is_available', 'updated_at'])

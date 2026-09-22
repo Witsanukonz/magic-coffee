@@ -1,9 +1,12 @@
+"""ข้อมูลถาวรของแต้มสะสม, ออเดอร์ และรายการสินค้าในออเดอร์."""
+
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
 
 class LoyaltyAccount(models.Model):
+    """บัญชีแต้มสะสมหนึ่งบัญชีต่อหนึ่งเบอร์โทรศัพท์."""
     phone = models.CharField(max_length=15, unique=True)
     completed_purchases = models.PositiveIntegerField(default=0)
     reward_balance = models.PositiveIntegerField(default=0)
@@ -15,10 +18,12 @@ class LoyaltyAccount(models.Model):
 
     @property
     def progress_to_reward(self):
+        """จำนวนการซื้อที่สะสมอยู่ในรอบปัจจุบัน (0 ถึง 9)."""
         return self.completed_purchases % 10
 
     @property
     def visits_to_next_reward(self):
+        """จำนวนครั้งที่เหลือก่อนแลกกาแฟฟรีได้อีกครั้ง."""
         return 10 - self.progress_to_reward if self.progress_to_reward else 10
 
     def __str__(self):
@@ -26,6 +31,7 @@ class LoyaltyAccount(models.Model):
 
 
 class Order(models.Model):
+    """หัวออเดอร์: ข้อมูลลูกค้า, ราคา, แต้ม และสถานะการทำเครื่องดื่ม."""
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'
         PREPARING = 'preparing', 'Preparing'
@@ -59,6 +65,7 @@ class Order(models.Model):
 
 
 class OrderItem(models.Model):
+    """Snapshot ของสินค้าในออเดอร์ เพื่อให้ประวัติไม่เปลี่ยนตามเมนูภายหลัง."""
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     menu_item = models.ForeignKey('menu.MenuItem', on_delete=models.SET_NULL, null=True)
     menu_name = models.CharField(max_length=150)
